@@ -10,6 +10,7 @@ class RouteData:
     dest_lon: float
     distance_m: int
     duration_s: int
+    duration_in_traffic_s: int
     start_time: datetime # Should be timezone-aware
 
     def get_field_names(self) -> List[str]:
