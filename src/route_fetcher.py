@@ -55,7 +55,8 @@ class RouteFetcher:
                 return RouteData(
                     origin_lat=origin_cords[0], origin_lon=origin_cords[1],
                     dest_lat=dest_cords[0], dest_lon=dest_cords[1],
-                    distance_m=element["distance"]["value"], duration_s=element["duration"]["value"],
+                    distance_m=element["distance"]["value"],
+                    duration_s=element["duration"]["value"],
                     duration_in_traffic_s=element["duration_in_traffic"]["value"],
                     start_time=datetime.now(tz=pytz.timezone("Europe/Berlin")))
             else:

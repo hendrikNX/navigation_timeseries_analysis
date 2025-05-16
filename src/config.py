@@ -8,8 +8,8 @@ load_dotenv(os.path.join(project_root, ".env"))
 
 API_KEY_GOOGLE_MAPS_PLATFORM = os.environ.get("API_KEY_GOOGLE_MAPS_PLATFORM")
 
-# Scheduler settings
-FETCH_INTERVAL_SECONDS = 15 * 60  # 15 minutes
+# Scheduler settings: How many times per hour to fetch data
+FETCH_FREQUENCY_PER_HOUR: int = 4  # e.g., 4 times per hour means every 15 minutes
 
 # --- Route settings ---
 # Default coordinates (used if environment variables are not set)
@@ -33,11 +33,14 @@ ORIGIN_COORDS: Tuple[float, float] = get_coords_from_env("ORIGIN_COORDS_LATLON",
 DEST_COORDS: Tuple[float, float] = get_coords_from_env("DEST_COORDS_LATLON", DEFAULT_DEST_LAT, DEFAULT_DEST_LON)
 
 # Storage settings
-STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "csv").lower()
+STORAGE_TYPE: str = os.environ.get("STORAGE_TYPE", "csv").lower()
 
-DATA_DIR = os.path.join(project_root, "data")
-CSV_FILE_PATH = os.path.join(DATA_DIR, "routes_data.csv")
-SQLITE_DB_PATH = os.path.join(DATA_DIR, "routes_data.db")
+# Determine the data directory: use APP_DATA_DIR from env if running in Docker,
+# otherwise default to a 'data' folder in the project root.
+APP_DATA_DIR_ENV: Optional[str] = os.environ.get("APP_DATA_DIR")
+DATA_DIR: str = APP_DATA_DIR_ENV if APP_DATA_DIR_ENV else os.path.join(project_root, "data")
+CSV_FILE_PATH: str = os.path.join(DATA_DIR, "routes_data.csv")
+SQLITE_DB_PATH: str = os.path.join(DATA_DIR, "routes_data.db")
 
 # Ensure data directory exists
 if not os.path.exists(DATA_DIR):
