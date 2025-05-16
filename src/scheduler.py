@@ -42,8 +42,8 @@ class JobScheduler:
         if not start_time_route_to_origin < end_time_route_to_origin:
             raise ValueError("start_time_route_to_origin must be less than end_time_route_to_origin.")
 
-        self.houre_range_to_dest = (start_time_route_to_dest, end_time_route_to_dest)
-        self.houre_range_to_origin = (start_time_route_to_origin, end_time_route_to_origin)
+        self.hour_range_to_dest = (start_time_route_to_dest, end_time_route_to_dest)
+        self.hour_range_to_origin = (start_time_route_to_origin, end_time_route_to_origin)
 
         if frequency_per_hour <= 0:
             raise ValueError("Frequency per hour must be a positive integer.")
@@ -61,74 +61,25 @@ class JobScheduler:
         while True:
             now = datetime.now(tz=pytz.timezone("Europe/Berlin"))
 
-            next_fetch_time = None
-            current_hour = now.hour
-
-            # Check for next fetch time within the allowed ranges, starting from the current time
-            for hour_offset in range(24):  # Check up to 24 hours ahead
-                target_hour = (current_hour + hour_offset) % 24
-
-                if self.houre_range_to_dest[0] <= target_hour < self.houre_range_to_dest[1]:
-                    # Route to destination
-                    for minute in sorted(scheduled_minutes):
-                        scheduled_time = now.replace(hour=target_hour, minute=minute, second=0, microsecond=0)
-                        if scheduled_time > now:
-                            next_fetch_time = scheduled_time
-                            break
-                    if next_fetch_time:
-                        break  # Stop searching if a time is found
-
-                if self.houre_range_to_origin[0] <= target_hour < self.houre_range_to_origin[1]:
-                    # Route to origin
-                    for minute in sorted(scheduled_minutes):
-                        scheduled_time = now.replace(hour=target_hour, minute=minute, second=0, microsecond=0)
-                        if scheduled_time > now:
-                            next_fetch_time = scheduled_time
-                            break
-                    if next_fetch_time:
-                        break  # Stop searching if a time is found
-
-                # If no time was found in the current hour, check the next hour
-                if not next_fetch_time and hour_offset > 0:
-                    # For subsequent hours, check all scheduled minutes
-                    if self.houre_range_to_dest[0] <= target_hour < self.houre_range_to_dest[1]:
-                        next_fetch_time = now.replace(hour=target_hour, minute=min(scheduled_minutes), second=0, microsecond=0)
-                        break
-                    if self.houre_range_to_origin[0] <= target_hour < self.houre_range_to_origin[1]:
-                        next_fetch_time = now.replace(hour=target_hour, minute=min(scheduled_minutes), second=0, microsecond=0)
-                        break
-
-            # If no valid time is found within the next 24 hours (should not happen with valid ranges),
-            # schedule for the next possible time in the future based on the ranges.
-            if not next_fetch_time:
-                next_valid_hour = min(self.houre_range_to_dest[0], self.houre_range_to_origin[0])
-                next_fetch_time = now.replace(hour=next_valid_hour, minute=min(scheduled_minutes), second=0, microsecond=0) + timedelta(days=1)
-
-            # Calculate sleep time
-            # Ensure the next fetch time is on a valid weekday
-            while next_fetch_time.weekday() not in self.weekdays:
-                next_fetch_time += timedelta(days=1)
-                next_fetch_time = next_fetch_time.replace(hour=min(self.houre_range_to_dest[0], self.houre_range_to_origin[0]), minute=min(scheduled_minutes), second=0, microsecond=0)
+            next_fetch_time = self.get_next_fetch_time(now)
 
             time_until_next_run = next_fetch_time - now
             sleep_seconds = time_until_next_run.total_seconds()
 
-            # If sleep_seconds is positive, wait. Otherwise, fetch immediately (we are past the scheduled time).
-            if sleep_seconds > 0:
-                print(f"[{now.isoformat()}] Waiting until {next_fetch_time.strftime('%H:%M:%S')} ({sleep_seconds:.2f} seconds)...")
-                time.sleep(sleep_seconds)
+            print(f"[{now.isoformat()}] Waiting until {next_fetch_time.strftime('%Y-%m-%d %H:%M:%S')} ({sleep_seconds:.2f} seconds)...")
+            time.sleep(sleep_seconds)
 
             current_time = datetime.now(tz=pytz.timezone("Europe/Berlin"))
             current_time_str = current_time.isoformat()
             print(f"[{current_time_str}] Fetching route data...")
             try:
                 route_data = None
-                if current_time.hour in range(*self.houre_range_to_dest):
+                if current_time.hour in range(*self.hour_range_to_dest):
                     route_data = self.route_fetcher.get_current_route_data(
                         origin_cords=self.origin_coords,
                         dest_cords=self.dest_coords
                     )
-                elif current_time.hour in range(*self.houre_range_to_origin):
+                elif current_time.hour in range(*self.hour_range_to_origin):
                     route_data = self.route_fetcher.get_current_route_data(
                         origin_cords=self.dest_coords,
                         dest_cords=self.origin_coords  
@@ -140,3 +91,18 @@ class JobScheduler:
                     print(f"[{current_time_str}] No data fetched or an error occurred during fetch.")
             except Exception as e:
                 print(f"[{current_time_str}] An error occurred in the scheduler loop: {e}")
+
+    def get_next_fetch_time(self, now: datetime):
+        next_fetch_time = None
+        reference_time = now.replace(minute=0, second=0, microsecond=0)
+
+        while not next_fetch_time:
+            if reference_time > now:
+                if reference_time.weekday() in self.weekdays:
+                    if self.hour_range_to_dest[0] <= reference_time.hour < self.hour_range_to_dest[1]:
+                        next_fetch_time = reference_time
+                    elif self.hour_range_to_origin[0] <= reference_time.hour < self.hour_range_to_origin[1]:
+                        next_fetch_time = reference_time
+            reference_time += timedelta(seconds=self.interval_seconds)
+
+        return next_fetch_time
