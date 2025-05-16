@@ -20,11 +20,13 @@ class JobScheduler:
                  start_time_route_to_dest: int,
                  end_time_route_to_dest: int,
                  start_time_route_to_origin: int,
-                 end_time_route_to_origin: int):
+                 end_time_route_to_origin: int,
+                 weekdays: list[int]):
         self.route_fetcher = route_fetcher
         self.data_storage = data_storage
         self.origin_coords = origin_coords
         self.dest_coords = dest_coords
+        self.weekdays = weekdays
 
         if not 0 <= start_time_route_to_dest <= 24:
             raise ValueError("Invalid start_time_route_to_dest. Must be between 0 and 24.")
@@ -50,7 +52,7 @@ class JobScheduler:
         self.interval_seconds = 3600 // frequency_per_hour # Use integer division
 
     def run(self):
-        print(f"Scheduler started. Fetching data {self.frequency_per_hour} times per hour for routes between {self.origin_coords} & {self.dest_coords}.")
+        print(f"Scheduler started. Fetching data {self.frequency_per_hour} times per hour for routes between {self.origin_coords} & {self.dest_coords} on days {self.weekdays}.")
         
         # Calculate the target minutes within the hour
         scheduled_minutes = [(i * 60) // self.frequency_per_hour for i in range(self.frequency_per_hour)]
@@ -103,6 +105,11 @@ class JobScheduler:
                 next_fetch_time = now.replace(hour=next_valid_hour, minute=min(scheduled_minutes), second=0, microsecond=0) + timedelta(days=1)
 
             # Calculate sleep time
+            # Ensure the next fetch time is on a valid weekday
+            while next_fetch_time.weekday() not in self.weekdays:
+                next_fetch_time += timedelta(days=1)
+                next_fetch_time = next_fetch_time.replace(hour=min(self.houre_range_to_dest[0], self.houre_range_to_origin[0]), minute=min(scheduled_minutes), second=0, microsecond=0)
+
             time_until_next_run = next_fetch_time - now
             sleep_seconds = time_until_next_run.total_seconds()
 
