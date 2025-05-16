@@ -37,7 +37,7 @@ class RouteFetcher:
             print("Error: API_KEY_GOOGLE_MAPS_PLATFORM is not set.")
             return None
 
-        url = f"{self.base_url}destinations={dest_cords[0]},{dest_cords[1]}&origins={origin_cords[0]},{origin_cords[1]}&units=metric&key={API_KEY}"
+        url = f"{self.base_url}destinations={dest_cords[0]},{dest_cords[1]}&origins={origin_cords[0]},{origin_cords[1]}&units=metric&departure_time=now&traffic_model=best_guess&key={API_KEY}"
 
         try:
             response = requests.get(url, timeout=10)
@@ -56,6 +56,7 @@ class RouteFetcher:
                     origin_lat=origin_cords[0], origin_lon=origin_cords[1],
                     dest_lat=dest_cords[0], dest_lon=dest_cords[1],
                     distance_m=element["distance"]["value"], duration_s=element["duration"]["value"],
+                    duration_in_traffic_s=element["duration_in_traffic"]["value"],
                     start_time=datetime.now(tz=pytz.timezone("Europe/Berlin")))
             else:
                 print(f"Error: Could not retrieve route information. Status: {element['status']}")
