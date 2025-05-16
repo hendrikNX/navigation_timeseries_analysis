@@ -26,6 +26,7 @@ MOCK_SUCCESS_RESPONSE_JSON: Dict[str, Any] = {
                 {
                     "distance": {"text": "10.0 km", "value": 10000},
                     "duration": {"text": "10 mins", "value": 600},
+                    "duration_in_traffic": {"text": "11 mins", "value": 660}, # Added duration_in_traffic
                     "status": "OK"
                 }
             ]
@@ -74,6 +75,7 @@ def test_get_current_route_data_success(route_fetcher: RouteFetcher, mock_reques
     assert route_data.dest_lon == TEST_DEST[1]
     assert route_data.distance_m == 10000
     assert route_data.duration_s == 600
+    assert route_data.duration_in_traffic_s == 660 # Assert the new field
     assert route_data.start_time == datetime(2023, 10, 27, 10, 0, 0, tzinfo=pytz.timezone("Europe/Berlin"))
 
     # Verify requests.get was called with the correct URL (basic check)

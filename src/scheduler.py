@@ -1,5 +1,5 @@
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 from typing import Tuple
 
@@ -133,5 +133,3 @@ class JobScheduler:
                     print(f"[{current_time_str}] No data fetched or an error occurred during fetch.")
             except Exception as e:
                 print(f"[{current_time_str}] An error occurred in the scheduler loop: {e}")
-            print(f"Waiting for {self.interval_seconds} seconds until next fetch...")
-            time.sleep(self.interval_seconds)

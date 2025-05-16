@@ -15,11 +15,13 @@ def test_route_data_creation():
         dest_lon=9.1,
         distance_m=10000,
         duration_s=600,
+        duration_in_traffic_s=650,
         start_time=now
     )
 
     assert data.origin_lat == 48.0
     assert data.duration_s == 600
+    assert data.duration_in_traffic_s == 650
     assert data.start_time == now
     assert isinstance(data, RouteData)
 
@@ -27,8 +29,8 @@ def test_route_data_get_field_names():
     """Tests if get_field_names returns the correct list of attribute names."""
     expected_fields = [
         "origin_lat", "origin_lon", "dest_lat", "dest_lon",
-        "distance_m", "duration_s", "start_time"
+        "distance_m", "duration_s", "duration_in_traffic_s", "start_time"
     ]
     # Create a dummy instance just to call the method
-    dummy_data = RouteData(0, 0, 0, 0, 0, 0, datetime.now(tz=pytz.timezone("UTC")))
+    dummy_data = RouteData(0, 0, 0, 0, 0, 0, 0, datetime.now(tz=pytz.timezone("UTC")))
     assert dummy_data.get_field_names() == expected_fields

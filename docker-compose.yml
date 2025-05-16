@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  scheduled_fetcher:
+    build:
+      context: .
+      dockerfile: Dockerfile.fetcher
+      args:
+        UV_VERSION: "0.6.14"
+        PYTHON_VERSION: "3.11"
+        BASE_LAYER: "bookworm-slim"
+    volumes:
+      # Mounts the host directory './data' (relative to docker-compose.yml)
+      # to /app/data inside the container.
+      - ./data:/app/data
+    environment:
+      # Tell Python to run in unbuffered mode so print statements appear immediately in logs
+      - PYTHONUNBUFFERED=1
+      # This tells the application inside the container where to store its data.
+      - APP_DATA_DIR=/app/data
+    # restart: unless-stopped # Optional: to restart the container if it stops

@@ -41,6 +41,7 @@ def sample_route_data() -> RouteData:
         dest_lon=TEST_DEST_COORDS[1],
         distance_m=5000,
         duration_s=300,
+        duration_in_traffic_s=250,
         start_time=datetime.now(tz=pytz.timezone("Europe/Berlin"))
     )
 
