@@ -1,0 +1,47 @@
+import os
+from dotenv import load_dotenv
+from typing import Tuple, Optional
+
+# Load environment variables from .env file
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(project_root, ".env"))
+
+API_KEY_GOOGLE_MAPS_PLATFORM = os.environ.get("API_KEY_GOOGLE_MAPS_PLATFORM")
+
+# Scheduler settings
+FETCH_INTERVAL_SECONDS = 15 * 60  # 15 minutes
+
+# --- Route settings ---
+# Default coordinates (used if environment variables are not set)
+DEFAULT_ORIGIN_LAT = 48.115581
+DEFAULT_ORIGIN_LON = 11.653591
+DEFAULT_DEST_LAT = 48.193418
+DEFAULT_DEST_LON = 11.552552
+
+def get_coords_from_env(env_var_name: str, default_lat: float, default_lon: float) -> Tuple[float, float]:
+    """Helper function to get coordinates from environment or use defaults."""
+    coords_str = os.environ.get(env_var_name)
+    if coords_str:
+        try:
+            lat_str, lon_str = coords_str.split(',')
+            return (float(lat_str.strip()), float(lon_str.strip()))
+        except ValueError:
+            print(f"Warning: Invalid format for {env_var_name} in .env. Expected 'lat,lon'. Using default.")
+    return (default_lat, default_lon)
+
+ORIGIN_COORDS: Tuple[float, float] = get_coords_from_env("ORIGIN_COORDS_LATLON", DEFAULT_ORIGIN_LAT, DEFAULT_ORIGIN_LON)
+DEST_COORDS: Tuple[float, float] = get_coords_from_env("DEST_COORDS_LATLON", DEFAULT_DEST_LAT, DEFAULT_DEST_LON)
+
+# Storage settings
+STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "csv").lower()
+
+DATA_DIR = os.path.join(project_root, "data")
+CSV_FILE_PATH = os.path.join(DATA_DIR, "routes_data.csv")
+SQLITE_DB_PATH = os.path.join(DATA_DIR, "routes_data.db")
+
+# Ensure data directory exists
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR)
+
+if not API_KEY_GOOGLE_MAPS_PLATFORM:
+    raise ValueError("API_KEY_GOOGLE_MAPS_PLATFORM not found. Please set it in .env or environment variables.")
