@@ -18,6 +18,7 @@ def sample_route_data_1() -> RouteData:
         dest_lon=9.1,
         distance_m=10000,
         duration_s=600,
+        duration_in_traffic_s=650,
         start_time=datetime(2023, 10, 27, 10, 0, 0, tzinfo=pytz.timezone("Europe/Berlin"))
     )
 
@@ -31,6 +32,7 @@ def sample_route_data_2() -> RouteData:
         dest_lon=9.3,
         distance_m=12000,
         duration_s=700,
+        duration_in_traffic_s=750,
         start_time=datetime(2023, 10, 27, 10, 15, 0, tzinfo=pytz.timezone("Europe/Berlin"))
     )
 
@@ -82,7 +84,8 @@ def test_csv_storage_save_single_route_data(csv_file_path: str, sample_route_dat
         assert data_row[1] == str(sample_route_data_1.origin_lon)
         assert data_row[4] == str(sample_route_data_1.distance_m)
         assert data_row[5] == str(sample_route_data_1.duration_s)
-        assert data_row[6] == sample_route_data_1.start_time.isoformat()
+        assert data_row[6] == str(sample_route_data_1.duration_in_traffic_s)
+        assert data_row[7] == sample_route_data_1.start_time.isoformat()
 
 def test_csv_storage_save_multiple_route_data(csv_file_path: str, sample_route_data_1: RouteData, sample_route_data_2: RouteData):
     """Tests saving multiple RouteData objects, ensuring they are appended."""
@@ -96,8 +99,8 @@ def test_csv_storage_save_multiple_route_data(csv_file_path: str, sample_route_d
         row1 = next(reader)
         row2 = next(reader)
 
-        assert row1[6] == sample_route_data_1.start_time.isoformat()
-        assert row2[6] == sample_route_data_2.start_time.isoformat()
+        assert row1[7] == sample_route_data_1.start_time.isoformat()
+        assert row2[7] == sample_route_data_2.start_time.isoformat()
         assert row2[4] == str(sample_route_data_2.distance_m)
 
         # Ensure no more rows

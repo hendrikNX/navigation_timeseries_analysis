@@ -12,6 +12,9 @@ API_KEY_GOOGLE_MAPS_PLATFORM = os.environ.get("API_KEY_GOOGLE_MAPS_PLATFORM")
 # How many times per hour to fetch data
 FETCH_FREQUENCY_PER_HOUR: int = 4  # e.g., 4 times per hour means every 15 minutes
 
+# On which weekdays to fetch data
+WEEKDAYS: list[int] = [0, 1, 2, 3, 4] # 0-6 for Monday-Sunday
+
 # In which time frames to fetch data
 START_TIME_ROUTE_TO_DEST: int = 6 # e.g., start at 6:00 for the route to the destination
 END_TIME_ROUTE_TO_DEST: int = 12

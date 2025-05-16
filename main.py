@@ -27,7 +27,8 @@ def main_app():
         start_time_route_to_dest=config.START_TIME_ROUTE_TO_DEST,
         end_time_route_to_dest=config.END_TIME_ROUTE_TO_DEST,
         start_time_route_to_origin=config.START_TIME_ROUTE_TO_ORIGIN,
-        end_time_route_to_origin=config.END_TIME_ROUTE_TO_ORIGIN
+        end_time_route_to_origin=config.END_TIME_ROUTE_TO_ORIGIN,
+        weekdays=config.WEEKDAYS
     )
 
     try:
