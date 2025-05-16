@@ -23,7 +23,11 @@ def main_app():
         data_storage=storage_backend,
         origin_coords=config.ORIGIN_COORDS,
         dest_coords=config.DEST_COORDS,
-        interval_seconds=config.FETCH_INTERVAL_SECONDS
+        frequency_per_hour=config.FETCH_FREQUENCY_PER_HOUR,
+        start_time_route_to_dest=config.START_TIME_ROUTE_TO_DEST,
+        end_time_route_to_dest=config.END_TIME_ROUTE_TO_DEST,
+        start_time_route_to_origin=config.START_TIME_ROUTE_TO_ORIGIN,
+        end_time_route_to_origin=config.END_TIME_ROUTE_TO_ORIGIN
     )
 
     try:

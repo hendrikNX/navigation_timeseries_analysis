@@ -8,8 +8,15 @@ load_dotenv(os.path.join(project_root, ".env"))
 
 API_KEY_GOOGLE_MAPS_PLATFORM = os.environ.get("API_KEY_GOOGLE_MAPS_PLATFORM")
 
-# Scheduler settings
-FETCH_INTERVAL_SECONDS = 15 * 60  # 15 minutes
+# --- Scheduler settings ---
+# How many times per hour to fetch data
+FETCH_FREQUENCY_PER_HOUR: int = 4  # e.g., 4 times per hour means every 15 minutes
+
+# In which time frames to fetch data
+START_TIME_ROUTE_TO_DEST: int = 6 # e.g., start at 6:00 for the route to the destination
+END_TIME_ROUTE_TO_DEST: int = 12
+START_TIME_ROUTE_TO_ORIGIN: int = 14 # e.g., start at 14:00 for the route back to the origin
+END_TIME_ROUTE_TO_ORIGIN: int = 20
 
 # --- Route settings ---
 # Default coordinates (used if environment variables are not set)
