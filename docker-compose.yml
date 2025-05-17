@@ -9,13 +9,24 @@ services:
         UV_VERSION: "0.6.14"
         PYTHON_VERSION: "3.11"
         BASE_LAYER: "bookworm-slim"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped # Optional: to restart the container if it stops
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+      args: # Pass your build ARGs here if needed
+        UV_VERSION: "0.1.16" # Example value, use your actual desired version
+        PYTHON_VERSION: "3.10" # Example value
+        BASE_LAYER: "slim-bookworm" # Example value
+    ports:
+      - "5000:5000"
     volumes:
-      # Mounts the host directory './data' (relative to docker-compose.yml)
-      # to /app/data inside the container.
       - ./data:/app/data
     environment:
-      # Tell Python to run in unbuffered mode so print statements appear immediately in logs
-      - PYTHONUNBUFFERED=1
-      # This tells the application inside the container where to store its data.
+      # - FLASK_DEBUG=0 # Set to 1 for development, 0 for production-like
       - APP_DATA_DIR=/app/data
-    # restart: unless-stopped # Optional: to restart the container if it stops
+      - STORAGE_TYPE="sqlite"
+    restart: unless-stopped
