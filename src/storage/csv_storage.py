@@ -1,6 +1,8 @@
 import csv
 import os
 from dataclasses import astuple
+from datetime import datetime, timezone
+
 from .base import DataStorage
 try:
     from ..data_models import RouteData # For application context
@@ -15,7 +17,7 @@ class CsvStorage(DataStorage):
     def _initialize_csv(self):
         if not os.path.exists(self.file_path) or os.path.getsize(self.file_path) == 0:
             # Create dummy RouteData instance to get headers in correct order
-            header = RouteData(0,0,0,0,0,0,0,None).get_field_names() # type: ignore
+            header = RouteData(0,0,0,0,0,0,0,datetime(2000, 1, 1, 12, 0, 0, tzinfo=timezone.utc)).get_field_names() # type: ignore
             with open(self.file_path, 'w', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerow(header)
