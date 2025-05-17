@@ -1,8 +1,8 @@
 from src import config
 from src.route_fetcher import RouteFetcher
 from src.storage.csv_storage import CsvStorage
+from src.storage.sqlite_storage import SQLiteStorage
 from src.scheduler import JobScheduler
-from src.storage.base import DataStorage # For type hinting
 
 def main_app():
     print("Starting Navigation Timeseries Analysis application...")
@@ -14,6 +14,9 @@ def main_app():
     if config.STORAGE_TYPE == "csv":
         storage_backend = CsvStorage(file_path=config.CSV_FILE_PATH)
         print(f"Using CSV storage: {config.CSV_FILE_PATH}")
+    elif config.STORAGE_TYPE == "sqlite":
+        storage_backend = SQLiteStorage(db_path=config.SQLITE_DB_PATH)
+        print(f"Using SQLite storage: {config.SQLITE_DB_PATH}")
     else:
         raise ValueError(f"Unsupported storage type: {config.STORAGE_TYPE}. Choose 'csv' or 'sqlite'.")
 
