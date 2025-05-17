@@ -1,0 +1,41 @@
+ARG UV_VERSION
+ARG PYTHON_VERSION
+ARG BASE_LAYER
+FROM ghcr.io/astral-sh/uv:$UV_VERSION-python$PYTHON_VERSION-$BASE_LAYER
+FROM python:3.10-slim
+
+
+# Install curl (damit wir uv installieren können)
+RUN apt-get update && apt-get install -y curl
+
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    cp /root/.local/bin/uv /usr/local/bin/uv
+
+
+# Create uv venv inside the Docker image
+# --seed ensures pip/setuptools are present if needed later
+RUN echo "Creating virtual environment with uv"
+RUN uv venv .venv --seed
+
+# Copy dependency definition files
+COPY pyproject.toml uv.lock* ./
+
+# Activate venv and install dependencies from lock file
+RUN echo "Activating virtual environment and installing dependencies"
+# Use a single RUN command for activation and sync
+RUN . .venv/bin/activate && \
+    echo "--- Environment activated ---" && \
+    echo "PATH is: $PATH" && \
+    UV_HTTP_TIMEOUT=120 uv sync --locked && \
+    echo "--- Sync finished ---"
+
+# Copy the rest of the application code
+# Assumes .dockerignore excludes the local .venv directory
+COPY . .
+
+# Expose the port the app runs on inside the container
+EXPOSE 5000
+
+# Start flask application using the venv created in the image
+CMD ["uv", "run", "flask", "run", "--host", "0.0.0.0", "--port", "5000"]
