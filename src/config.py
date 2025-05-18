@@ -52,6 +52,9 @@ DATA_DIR: str = APP_DATA_DIR_ENV if APP_DATA_DIR_ENV else os.path.join(project_r
 CSV_FILE_PATH: str = os.path.join(DATA_DIR, "routes_data.csv")
 SQLITE_DB_PATH: str = os.path.join(DATA_DIR, "routes_data.db")
 
+# API settings
+API_BASE_URL: str = os.environ.get("API_BASE_URL", "http://localhost:5000") # Base URL for the API service
+
 # Ensure data directory exists
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)

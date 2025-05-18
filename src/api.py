@@ -1,24 +1,33 @@
 from flask import Flask, request, jsonify
 from datetime import datetime
-import sqlite3 # For the get_all_data method in SQLiteStorage if it uses sqlite3.Row
+# import sqlite3 # No longer needed directly here
 
 # Assuming src is in PYTHONPATH or running from project root
 try:
     from .storage.sqlite_storage import SQLiteStorage
+    from .storage.csv_storage import CsvStorage
     from .data_models import RouteData
-    from .config import SQLITE_DB_PATH, DATA_DIR # DATA_DIR for Docker volume mapping reference
+    from .config import SQLITE_DB_PATH, CSV_FILE_PATH, STORAGE_TYPE, DATA_DIR # DATA_DIR for Docker volume mapping reference
 except ImportError:
     # Fallback for simpler execution context (e.g. direct run of api.py for testing)
     from storage.sqlite_storage import SQLiteStorage
+    from storage.csv_storage import CsvStorage
     from data_models import RouteData
-    from config import SQLITE_DB_PATH, DATA_DIR
+    from config import SQLITE_DB_PATH, CSV_FILE_PATH, STORAGE_TYPE, DATA_DIR
 
 app = Flask(__name__)
 
-# Initialize storage.
-# SQLITE_DB_PATH from config.py will be used.
-# If running in Docker, this path points to the location *inside* the container.
-storage = SQLiteStorage(db_path=SQLITE_DB_PATH)
+# Initialize storage based on configuration
+if STORAGE_TYPE == "sqlite":
+    storage = SQLiteStorage(db_path=SQLITE_DB_PATH)
+    app.logger.info(f"Using SQLite storage: {SQLITE_DB_PATH}")
+elif STORAGE_TYPE == "csv":
+    storage = CsvStorage(file_path=CSV_FILE_PATH)
+    app.logger.info(f"Using CSV storage: {CSV_FILE_PATH}")
+else:
+    # Default to SQLite if an unsupported type is specified
+    app.logger.error(f"Unsupported STORAGE_TYPE: {STORAGE_TYPE}. Defaulting to SQLite.")
+    storage = SQLiteStorage(db_path=SQLITE_DB_PATH)
 
 @app.route('/api/routes', methods=['POST'])
 def add_route_data():
@@ -65,23 +74,14 @@ def get_route_data():
         if limit <= 0 or limit > 1000: # Add a reasonable upper bound
             limit = 100
 
-        # For this GET endpoint, we'll query directly for flexibility,
-        # but you could also add a method to SQLiteStorage.
-        conn = sqlite3.connect(SQLITE_DB_PATH)
-        conn.row_factory = sqlite3.Row # Access columns by name
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM route_times ORDER BY start_time DESC LIMIT ?", (limit,))
-        rows = cursor.fetchall()
-        conn.close()
-        
-        return jsonify([dict(row) for row in rows]), 200
+        data = storage.load(limit=limit)
+        return jsonify(data), 200
     except Exception as e:
         app.logger.error(f"Error fetching data: {e}")
         return jsonify({"error": "An internal error occurred while fetching data"}), 500
 
 if __name__ == '__main__':
     # This is for local development. For Docker, use `flask run` or a WSGI server.
-    # The SQLiteStorage class handles DB and directory creation.
-    app.logger.info(f"Database is configured at: {SQLITE_DB_PATH}")
+    # Storage initialization messages are now printed above.
     app.logger.info(f"Data directory is: {DATA_DIR}")
     app.run(host='0.0.0.0', port=5000, debug=True)
