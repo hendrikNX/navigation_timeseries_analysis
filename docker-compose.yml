@@ -11,6 +11,7 @@ services:
         BASE_LAYER: "bookworm-slim"
     environment:
       - PYTHONUNBUFFERED=1
+      - API_BASE_URL=http://api:5000
     env_file:
       - .env
     restart: unless-stopped # Optional: to restart the container if it stops
@@ -30,6 +31,6 @@ services:
     environment:
       # - FLASK_DEBUG=0 # Set to 1 for development, 0 for production-like
       - APP_DATA_DIR=/app/data
-      - STORAGE_TYPE="sqlite"
+      - STORAGE_TYPE=sqlite
       - FLASK_APP=src.api
     restart: unless-stopped

@@ -10,20 +10,10 @@ def main_app():
     # Initialize components
     route_fetcher = RouteFetcher() # API key is handled via config/env by RouteFetcher
 
-    # Select storage backend based on configuration (Strategy Pattern)
-    if config.STORAGE_TYPE == "csv":
-        storage_backend = CsvStorage(file_path=config.CSV_FILE_PATH)
-        print(f"Using CSV storage: {config.CSV_FILE_PATH}")
-    elif config.STORAGE_TYPE == "sqlite":
-        storage_backend = SQLiteStorage(db_path=config.SQLITE_DB_PATH)
-        print(f"Using SQLite storage: {config.SQLITE_DB_PATH}")
-    else:
-        raise ValueError(f"Unsupported storage type: {config.STORAGE_TYPE}. Choose 'csv' or 'sqlite'.")
-
     # Initialize and run the scheduler
     scheduler = JobScheduler(
         route_fetcher=route_fetcher,
-        data_storage=storage_backend,
+        api_base_url=config.API_BASE_URL, # Use API_BASE_URL from config
         origin_coords=config.ORIGIN_COORDS,
         dest_coords=config.DEST_COORDS,
         frequency_per_hour=config.FETCH_FREQUENCY_PER_HOUR,

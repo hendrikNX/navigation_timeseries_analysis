@@ -1,19 +1,21 @@
 import time
 from datetime import datetime, timedelta
 import pytz
+import requests # Added for making HTTP requests
+from dataclasses import asdict # Added for converting RouteData to dict
 from typing import Tuple
 
 try:
     from .route_fetcher import RouteFetcher
-    from .storage.base import DataStorage
+    from .data_models import RouteData # Ensure RouteData is imported for type hinting
 except ImportError: # Fallback for potential direct execution or different project structures
     from route_fetcher import RouteFetcher
-    from storage.base import DataStorage
+    from data_models import RouteData
 
 class JobScheduler:
     def __init__(self,
                  route_fetcher: RouteFetcher,
-                 data_storage: DataStorage,
+                 api_base_url: str,
                  origin_coords: Tuple[float, float],
                  dest_coords: Tuple[float, float],
                  frequency_per_hour: int,
@@ -23,7 +25,7 @@ class JobScheduler:
                  end_time_route_to_origin: int,
                  weekdays: list[int]):
         self.route_fetcher = route_fetcher
-        self.data_storage = data_storage
+        self.api_base_url = api_base_url
         self.origin_coords = origin_coords
         self.dest_coords = dest_coords
         self.weekdays = weekdays
@@ -50,6 +52,27 @@ class JobScheduler:
         self.frequency_per_hour = frequency_per_hour
         # Calculate interval in seconds. 3600 seconds in an hour.
         self.interval_seconds = 3600 // frequency_per_hour # Use integer division
+
+    def _save_route_data_via_api(self, route_data: RouteData) -> None:
+        """
+        Saves the route data by sending it to the API.
+        """
+        api_url = f"{self.api_base_url}/api/routes"
+        try:
+            # Convert RouteData to dict and ensure start_time is ISO format string
+            payload = asdict(route_data)
+            if isinstance(payload.get("start_time"), datetime):
+                payload["start_time"] = payload["start_time"].isoformat()
+
+            response = requests.post(api_url, json=payload, timeout=10)
+            response.raise_for_status() # Raises HTTPError for 4XX/5XX responses
+            print(f"[{datetime.now(tz=pytz.timezone('Europe/Berlin')).isoformat()}] Data successfully sent to API: {api_url}")
+        except requests.exceptions.RequestException as e:
+            print(f"[{datetime.now(tz=pytz.timezone('Europe/Berlin')).isoformat()}] Error sending data to API {api_url}: {e}")
+        except Exception as e:
+            # Catch any other unexpected errors during payload prep or sending
+            print(f"[{datetime.now(tz=pytz.timezone('Europe/Berlin')).isoformat()}] Unexpected error preparing/sending data to API: {e}")
+
 
     def run(self):
         print(f"Scheduler started. Fetching data {self.frequency_per_hour} times per hour for routes between {self.origin_coords} & {self.dest_coords} on days {self.weekdays}.")
@@ -85,8 +108,8 @@ class JobScheduler:
                         dest_cords=self.origin_coords  
                     )
                 if route_data:
-                    self.data_storage.save(route_data)
-                    print(f"[{current_time_str}] Data processed and saved.")
+                    self._save_route_data_via_api(route_data)
+                    # Success message is now handled within _save_route_data_via_api
                 else:
                     print(f"[{current_time_str}] No data fetched or an error occurred during fetch.")
             except Exception as e:

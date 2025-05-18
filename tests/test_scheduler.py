@@ -3,6 +3,7 @@ from unittest.mock import MagicMock # Can also use mocker.MagicMock
 from datetime import datetime, timedelta
 import pytz
 from freezegun import freeze_time
+from dataclasses import asdict
 from pytest_mock import MockerFixture
 
 # Attempt to import from src, assuming tests are run from project root
@@ -41,13 +42,12 @@ def dest_coords() -> tuple[float, float]:
 @pytest.fixture
 def default_scheduler_params(
     mock_route_fetcher: MagicMock,
-    mock_data_storage: MagicMock,
     origin_coords: tuple[float, float],
     dest_coords: tuple[float, float]
 ) -> dict:
     return {
         "route_fetcher": mock_route_fetcher,
-        "data_storage": mock_data_storage,
+        "api_base_url": "http://mock-api.test/for_default_params", # Added
         "origin_coords": origin_coords,
         "dest_coords": dest_coords,
         "frequency_per_hour": 4,
@@ -74,6 +74,7 @@ class TestJobSchedulerInit:
         assert scheduler.interval_seconds == 900  # 3600 / 4
         assert scheduler.hour_range_to_dest == (7, 10)
         assert scheduler.hour_range_to_origin == (16, 19)
+        assert scheduler.api_base_url == "http://mock-api.test/for_default_params"
 
     def test_invalid_frequency(self, default_scheduler_params: dict):
         params = default_scheduler_params.copy()
@@ -106,11 +107,11 @@ class TestJobSchedulerInit:
 
 class TestJobSchedulerGetNextFetchTime:
     @pytest.fixture
-    def scheduler(self, mock_route_fetcher, mock_data_storage, origin_coords, dest_coords) -> JobScheduler:
+    def scheduler(self, mock_route_fetcher: MagicMock, origin_coords: tuple[float, float], dest_coords: tuple[float, float]) -> JobScheduler:
         # Scheduler with freq=4 (15 min interval), Mon-Fri, Dest: 7-9, Origin: 16-18
         return JobScheduler(
             route_fetcher=mock_route_fetcher,
-            data_storage=mock_data_storage,
+            api_base_url="http://mock-api.test", # Use a mock URL for testing
             origin_coords=origin_coords,
             dest_coords=dest_coords,
             frequency_per_hour=4,
@@ -157,9 +158,10 @@ class TestJobSchedulerGetNextFetchTime:
         expected_next_fetch = berlin_tz.localize(datetime(2024, 3, 11, 7, 0, 0))  # Next Monday 07:00
         assert scheduler.get_next_fetch_time(now) == expected_next_fetch
 
-    def test_frequency_one_per_hour(self, mock_route_fetcher, mock_data_storage, origin_coords, dest_coords, berlin_tz):
+    def test_frequency_one_per_hour(self, mock_route_fetcher: MagicMock, origin_coords: tuple[float, float], dest_coords: tuple[float, float], berlin_tz: pytz.BaseTzInfo):
         scheduler = JobScheduler(
-            route_fetcher=mock_route_fetcher, data_storage=mock_data_storage,
+            route_fetcher=mock_route_fetcher, 
+            api_base_url="http://mock-api.test/for_freq_one", # Use a mock URL for testing
             origin_coords=origin_coords, dest_coords=dest_coords,
             frequency_per_hour=1,  # Every hour
             start_time_route_to_dest=7, end_time_route_to_dest=10,
@@ -181,11 +183,11 @@ class TestJobSchedulerGetNextFetchTime:
 
 class TestJobSchedulerRun:
     @pytest.fixture
-    def run_scheduler(self, mock_route_fetcher, mock_data_storage, origin_coords, dest_coords) -> JobScheduler:
+    def run_scheduler(self, mock_route_fetcher: MagicMock, origin_coords: tuple[float, float], dest_coords: tuple[float, float]) -> JobScheduler:
         # Dest: 8-8:59, Origin: 17-17:59, Mon, Freq=4
         return JobScheduler(
             route_fetcher=mock_route_fetcher,
-            data_storage=mock_data_storage,
+            api_base_url="http://mock-api.test", # Use a mock URL for testing
             origin_coords=origin_coords,
             dest_coords=dest_coords,
             frequency_per_hour=4,
@@ -206,12 +208,13 @@ class TestJobSchedulerRun:
         )
 
     def test_run_fetches_to_dest_and_saves(
-        self, run_scheduler: JobScheduler, mock_route_fetcher: MagicMock, mock_data_storage: MagicMock,
+        self, run_scheduler: JobScheduler, mock_route_fetcher: MagicMock,
         origin_coords, dest_coords, sample_route_data: RouteData,
         mocker: MockerFixture, berlin_tz
     ):
         mocker.patch('builtins.print') # Suppress print
         mock_sleep = mocker.patch('time.sleep')
+        mock_requests_post = mocker.patch('src.scheduler.requests.post')
 
         initial_now = berlin_tz.localize(datetime(2024, 3, 4, 7, 59, 50))  # Monday, 10s before 8:00
         fetch_time = berlin_tz.localize(datetime(2024, 3, 4, 8, 0, 0))
@@ -220,8 +223,6 @@ class TestJobSchedulerRun:
             # Mock get_next_fetch_time and capture the mock object
             mock_get_next_fetch_time = mocker.patch.object(run_scheduler, 'get_next_fetch_time', side_effect=[fetch_time, StopIteration])
             
-            # Route fetcher returns data, its start_time will be based on frozen_datetime at fetch
-            sample_route_data.start_time = fetch_time # Adjust expected data
             mock_route_fetcher.get_current_route_data.return_value = sample_route_data
             
             def advance_time_and_assert_sleep(seconds):
@@ -239,15 +240,21 @@ class TestJobSchedulerRun:
                 origin_cords=origin_coords,
                 dest_cords=dest_coords
             )
-            mock_data_storage.save.assert_called_once_with(sample_route_data)
+
+            expected_api_url = f"{run_scheduler.api_base_url}/api/routes"
+            expected_payload = asdict(sample_route_data)
+            expected_payload["start_time"] = sample_route_data.start_time.isoformat() # As done in _save_route_data_via_api
+
+            mock_requests_post.assert_called_once_with(expected_api_url, json=expected_payload, timeout=10)
 
     def test_run_fetches_to_origin_and_saves(
-        self, run_scheduler: JobScheduler, mock_route_fetcher: MagicMock, mock_data_storage: MagicMock,
+        self, run_scheduler: JobScheduler, mock_route_fetcher: MagicMock,
         origin_coords, dest_coords, sample_route_data: RouteData,
         mocker: MockerFixture, berlin_tz
     ):
         mocker.patch('builtins.print')
         mock_sleep = mocker.patch('time.sleep')
+        mock_requests_post = mocker.patch('src.scheduler.requests.post')
 
         initial_now = berlin_tz.localize(datetime(2024, 3, 4, 16, 59, 50))  # Monday, 10s before 17:00
         fetch_time = berlin_tz.localize(datetime(2024, 3, 4, 17, 0, 0))
@@ -255,7 +262,7 @@ class TestJobSchedulerRun:
         with freeze_time(initial_now) as frozen_datetime:
             # Mock get_next_fetch_time (no assertion on its calls in this specific test, but good practice if needed)
             _ = mocker.patch.object(run_scheduler, 'get_next_fetch_time', side_effect=[fetch_time, StopIteration])
-            sample_route_data.start_time = fetch_time # Adjust expected data
+            sample_route_data.start_time = fetch_time # Align sample data's start_time
             mock_route_fetcher.get_current_route_data.return_value = sample_route_data
 
             def advance_time_and_assert_sleep(seconds):
@@ -270,14 +277,20 @@ class TestJobSchedulerRun:
                 origin_cords=dest_coords,  # Swapped for "to_origin"
                 dest_cords=origin_coords
             )
-            mock_data_storage.save.assert_called_once_with(sample_route_data)
+            
+            expected_api_url = f"{run_scheduler.api_base_url}/api/routes"
+            expected_payload = asdict(sample_route_data)
+            expected_payload["start_time"] = sample_route_data.start_time.isoformat()
+
+            mock_requests_post.assert_called_once_with(expected_api_url, json=expected_payload, timeout=10)
 
     def test_run_no_data_fetched(
-        self, run_scheduler: JobScheduler, mock_route_fetcher: MagicMock, mock_data_storage: MagicMock,
+        self, run_scheduler: JobScheduler, mock_route_fetcher: MagicMock,
         mocker: MockerFixture, berlin_tz: pytz.BaseTzInfo
     ):
         mock_print = mocker.patch('builtins.print') # Mock print to check its calls
         mock_sleep = mocker.patch('time.sleep')
+        mock_requests_post = mocker.patch('src.scheduler.requests.post')
 
         initial_now = berlin_tz.localize(datetime(2024, 3, 4, 7, 59, 50)) # Monday
         fetch_time = berlin_tz.localize(datetime(2024, 3, 4, 8, 0, 0))
@@ -293,7 +306,7 @@ class TestJobSchedulerRun:
                 run_scheduler.run()
             
             mock_route_fetcher.get_current_route_data.assert_called_once()
-            mock_data_storage.save.assert_not_called()
+            mock_requests_post.assert_not_called()
             
             # Check for the specific print message
             printed_messages = "".join(c[0][0] for c in mock_print.call_args_list if c[0])
