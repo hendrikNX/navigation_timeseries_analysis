@@ -71,3 +71,16 @@ class SQLiteStorage(DataStorage):
         conn.commit()
         conn.close()
         print(f"Data saved to SQLite DB: {self.db_path}, Row ID: {cursor.lastrowid}")
+
+    def load(self, limit: int) -> list[dict]:
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row # Access columns by name
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM route_times ORDER BY start_time DESC LIMIT ?", (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        
+        # Convert sqlite3.Row objects to dictionaries
+        # The 'start_time' is already stored as TEXT (ISO format string)
+        # so no conversion is needed for it here.
+        return [dict(row) for row in rows]

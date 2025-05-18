@@ -8,3 +8,7 @@ class DataStorage(ABC):
     @abstractmethod
     def save(self, route_data: RouteData) -> None:
         pass
+
+    @abstractmethod
+    def load(self, limit: int) -> list[dict]:
+        pass
