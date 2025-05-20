@@ -1,12 +1,14 @@
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from .base import DataStorage
+from .base import DataStorage, DeleteParams
 try:
     from ..data_models import RouteData
 except ImportError:
     from data_models import RouteData # For standalone testing if needed
+from typing_extensions import Unpack
+from typing import TypedDict, Union, List, Tuple
 
 class SQLiteStorage(DataStorage):
     def __init__(self, db_path: str):
@@ -25,8 +27,7 @@ class SQLiteStorage(DataStorage):
 
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        # The table schema matches the fields in RouteData
-        # start_time will be stored as TEXT in ISO 8601 format
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS route_times (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +48,6 @@ class SQLiteStorage(DataStorage):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # Ensure start_time is in ISO format string
         start_time_iso = route_data.start_time.isoformat()
 
         data_to_insert = (
@@ -80,7 +80,65 @@ class SQLiteStorage(DataStorage):
         rows = cursor.fetchall()
         conn.close()
         
-        # Convert sqlite3.Row objects to dictionaries
-        # The 'start_time' is already stored as TEXT (ISO format string)
-        # so no conversion is needed for it here.
         return [dict(row) for row in rows]
+    
+    def delete(self, **kwargs: Unpack[DeleteParams]):
+        if not kwargs or len(kwargs) > 1:
+            raise ValueError("Deletion requires exactly one condition.")
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        query_conditions = []
+        params = []
+
+        if 'time' in kwargs:
+            time_param = kwargs['time']
+            if isinstance(time_param, list):
+                times_list = [self._time_round_minutes(t) for t in time_param]
+                print(f"Processing deletion based on timestamp(s): {[t.strftime('%Y-%m-%d %H:%M') for t in times_list]}")
+                for t_rounded in times_list:
+                    query_conditions.append("(start_time >= ? AND start_time < ?)")
+                    params.extend([t_rounded.isoformat(), (t_rounded + timedelta(minutes=1)).isoformat()])
+            else:
+                t_rounded = self._time_round_minutes(time_param)
+                print(f"Processing deletion based on timestamp: {t_rounded.strftime('%Y-%m-%d %H:%M')}")
+                query_conditions.append("(start_time >= ? AND start_time < ?)")
+                params.extend([t_rounded.isoformat(), (t_rounded + timedelta(minutes=1)).isoformat()])
+        
+        elif 'time_range' in kwargs:
+            time_range_param = kwargs['time_range']
+            if not (isinstance(time_range_param, tuple) and len(time_range_param) == 2 and
+                    isinstance(time_range_param[0], datetime) and isinstance(time_range_param[1], datetime)):
+                raise ValueError("time_range must be a tuple of two datetime objects.")
+            if time_range_param[0] >= time_range_param[1]:
+                raise ValueError("Start of time_range must be before end of time_range.")
+
+            start_time_rounded = self._time_round_minutes(time_range_param[0])
+            end_time_rounded = self._time_round_minutes(time_range_param[1])
+            print(f"Processing deletion based on timestamp range: {start_time_rounded.isoformat()} to {end_time_rounded.isoformat()}")
+            query_conditions.append("(start_time >= ? AND start_time < ?)")
+            params.extend([start_time_rounded.isoformat(), end_time_rounded.isoformat()])
+
+        elif 'id' in kwargs:
+            id_param = kwargs['id']
+            if isinstance(id_param, list):
+                if not id_param: # Handle empty list case
+                    print("Processing deletion based on id list: No IDs provided, no rows will be deleted.")
+                    # Effectively a no-op, or raise error if empty list is invalid
+                    query_conditions.append("1=0") # Condition that is always false
+                else:
+                    print(f"Processing deletion based on id list: {id_param}")
+                    placeholders = ', '.join(['?'] * len(id_param))
+                    query_conditions.append(f"id IN ({placeholders})")
+                    params.extend(id_param)
+            else:
+                print(f"Processing deletion based on id: {id_param}")
+                query_conditions.append("id = ?")
+                params.append(id_param)
+
+        sql = f"DELETE FROM route_times WHERE {' OR '.join(query_conditions)}"
+        cursor.execute(sql, params)
+        conn.commit()
+        conn.close()
+        print(f"Deleted {cursor.rowcount} rows from SQLite DB based on criteria: {kwargs} using query: {sql} with params: {params}")

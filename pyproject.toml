@@ -15,4 +15,5 @@ dependencies = [
     "pytz>=2025.2",
     "requests>=2.32.3",
     "typing>=3.10.0.0",
+    "typing-extensions>=4.13.2",
 ]

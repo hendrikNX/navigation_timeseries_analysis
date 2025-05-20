@@ -186,3 +186,179 @@ class TestApiGetRoutes:
         response = client.get('/api/routes?limit=abc')
         data = response.json
         assert len(data) == 1 # Default limit of 100 is applied, but only 1 item exists
+
+
+class TestApiDeleteRoutes:
+
+    def _get_all_db_records(self, db_path):
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM route_times ORDER BY id ASC")
+        records = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return records
+
+    def test_delete_by_single_id_success(self, client, sample_payload_valid, tmp_path):
+        # Post two records
+        client.post('/api/routes', json=sample_payload_valid) # ID 1
+        payload2 = sample_payload_valid.copy()
+        payload2["distance_m"] = 100
+        client.post('/api/routes', json=payload2) # ID 2
+
+        db_path = tmp_path / "test_api_routes.db"
+        assert len(self._get_all_db_records(db_path)) == 2
+
+        response = client.delete('/api/routes?id=1')
+        assert response.status_code == 200
+        assert "Deletion process initiated" in response.json["message"]
+
+        records = self._get_all_db_records(db_path)
+        assert len(records) == 1
+        assert records[0]["id"] == 2
+        assert records[0]["distance_m"] == 100
+
+    def test_delete_by_list_of_ids_success(self, client, sample_payload_valid, tmp_path):
+        client.post('/api/routes', json=sample_payload_valid) # ID 1
+        payload2 = sample_payload_valid.copy(); payload2["distance_m"] = 200
+        client.post('/api/routes', json=payload2) # ID 2
+        payload3 = sample_payload_valid.copy(); payload3["distance_m"] = 300
+        client.post('/api/routes', json=payload3) # ID 3
+
+        db_path = tmp_path / "test_api_routes.db"
+        assert len(self._get_all_db_records(db_path)) == 3
+
+        response = client.delete('/api/routes?id=1,3')
+        assert response.status_code == 200
+
+        records = self._get_all_db_records(db_path)
+        assert len(records) == 1
+        assert records[0]["id"] == 2
+        assert records[0]["distance_m"] == 200
+
+    def test_delete_by_single_time_success(self, client, sample_payload_valid, tmp_path):
+        time_base = datetime(2023, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
+        
+        payload1 = sample_payload_valid.copy(); payload1["start_time"] = time_base.isoformat(); payload1["distance_m"] = 10
+        client.post('/api/routes', json=payload1) # Will be deleted
+
+        payload2 = sample_payload_valid.copy(); payload2["start_time"] = (time_base + timedelta(seconds=30)).isoformat(); payload2["distance_m"] = 20
+        client.post('/api/routes', json=payload2) # Will be deleted (same minute)
+
+        payload3 = sample_payload_valid.copy(); payload3["start_time"] = (time_base + timedelta(minutes=5)).isoformat(); payload3["distance_m"] = 30
+        client.post('/api/routes', json=payload3) # Should remain
+
+        db_path = tmp_path / "test_api_routes.db"
+        assert len(self._get_all_db_records(db_path)) == 3
+
+        # Delete using a time that falls into the first minute
+        response = client.delete(f'/api/routes?time={time_base.isoformat()}')
+        assert response.status_code == 200
+
+        records = self._get_all_db_records(db_path)
+        assert len(records) == 1
+        assert records[0]["distance_m"] == 30
+
+    def test_delete_by_time_range_success(self, client, sample_payload_valid, tmp_path):
+        time_base = datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        
+        payload_before = sample_payload_valid.copy(); payload_before["start_time"] = (time_base - timedelta(minutes=10)).isoformat(); payload_before["distance_m"] = 100
+        client.post('/api/routes', json=payload_before) # Should remain
+
+        payload_in = sample_payload_valid.copy(); payload_in["start_time"] = time_base.isoformat(); payload_in["distance_m"] = 200
+        client.post('/api/routes', json=payload_in) # Should be deleted
+
+        payload_after = sample_payload_valid.copy(); payload_after["start_time"] = (time_base + timedelta(minutes=10)).isoformat(); payload_after["distance_m"] = 300
+        client.post('/api/routes', json=payload_after) # Should remain
+
+        db_path = tmp_path / "test_api_routes.db"
+        assert len(self._get_all_db_records(db_path)) == 3
+
+        start_range_iso = (time_base - timedelta(minutes=5)).isoformat()
+        end_range_iso = (time_base + timedelta(minutes=5)).isoformat()
+
+        response = client.delete(f'/api/routes?start_time={start_range_iso}&end_time={end_range_iso}')
+        assert response.status_code == 200
+
+        records = self._get_all_db_records(db_path)
+        assert len(records) == 2
+        distances = {r["distance_m"] for r in records}
+        assert 100 in distances
+        assert 300 in distances
+        assert 200 not in distances
+
+    def test_delete_no_criteria(self, client):
+        response = client.delete('/api/routes')
+        assert response.status_code == 400
+        assert "No deletion criteria provided" in response.json["error"]
+
+    def test_delete_multiple_criteria(self, client):
+        time_now_iso = datetime.now(timezone.utc).isoformat()
+        response = client.delete(f'/api/routes?id=1&time={time_now_iso}')
+        assert response.status_code == 400
+        assert "Multiple deletion criteria provided" in response.json["error"]
+
+    def test_delete_invalid_id_format(self, client):
+        response = client.delete('/api/routes?id=abc')
+        assert response.status_code == 400
+        assert "Invalid parameter format" in response.json["error"]
+        assert "invalid literal for int()" in response.json["error"]
+
+    def test_delete_invalid_time_format(self, client):
+        response = client.delete('/api/routes?time=not-a-date')
+        assert response.status_code == 400
+        assert "Invalid parameter format" in response.json["error"]
+        assert "Invalid isoformat string" in response.json["error"]
+
+    def test_delete_time_not_timezone_aware(self, client):
+        naive_time_iso = datetime.now().isoformat() # Naive datetime
+        response = client.delete(f'/api/routes?time={naive_time_iso}')
+        assert response.status_code == 400
+        assert "Invalid parameter format" in response.json["error"]
+        assert "All 'time' values must be timezone-aware" in response.json["error"]
+
+    def test_delete_invalid_time_range_start_after_end(self, client):
+        start_time = datetime.now(timezone.utc)
+        end_time = start_time - timedelta(hours=1)
+        response = client.delete(f'/api/routes?start_time={start_time.isoformat()}&end_time={end_time.isoformat()}')
+        assert response.status_code == 400
+        assert "Invalid parameter format" in response.json["error"] # This error comes from API layer
+        assert "start_time must be before end_time" in response.json["error"]
+
+    def test_delete_time_range_missing_one_part(self, client):
+        start_time_iso = datetime.now(timezone.utc).isoformat()
+        response = client.delete(f'/api/routes?start_time={start_time_iso}')
+        assert response.status_code == 400
+        assert "Both start_time and end_time are required" in response.json["error"]
+
+    def test_delete_non_existent_id(self, client, sample_payload_valid, tmp_path):
+        client.post('/api/routes', json=sample_payload_valid) # ID 1
+        db_path = tmp_path / "test_api_routes.db"
+        initial_records_count = len(self._get_all_db_records(db_path))
+
+        response = client.delete('/api/routes?id=999')
+        assert response.status_code == 200 # Deleting non-existent is not an API error
+        
+        assert len(self._get_all_db_records(db_path)) == initial_records_count
+
+    def test_delete_empty_id_list_in_params(self, client, sample_payload_valid, tmp_path):
+        # Test ?id= (empty string)
+        # The API's parsing `int(id_str)` will raise ValueError for empty string.
+        response = client.delete('/api/routes?id=')
+        assert response.status_code == 400
+        assert "Invalid parameter format" in response.json["error"]
+
+        # Test ?id=,, (list of empty strings)
+        # The API's parsing `[int(i.strip()) for i in id_str.split(',') if i.strip()]`
+        # will result in an empty list. Then `if not delete_kwargs['id']` check is hit.
+        client.post('/api/routes', json=sample_payload_valid) # Add some data
+        db_path = tmp_path / "test_api_routes.db"
+        initial_records_count = len(self._get_all_db_records(db_path))
+
+        response = client.delete('/api/routes?id=,,')
+        assert response.status_code == 400 # API raises ValueError("ID list cannot be empty if commas are present.")
+        assert "Invalid parameter format" in response.json["error"]
+        assert "ID list cannot be empty" in response.json["error"]
+
+        # Ensure no data was deleted
+        assert len(self._get_all_db_records(db_path)) == initial_records_count
