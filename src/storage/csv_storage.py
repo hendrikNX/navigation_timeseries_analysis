@@ -42,34 +42,43 @@ class CsvStorage(DataStorage):
             writer.writerow(data_tuple)
         print(f"Data saved to CSV: {self.file_path}")
 
-    def load(self, limit: int) -> list[dict]:
+    def load(self, limit: int) -> list[RouteData]:
         records = []
         if not os.path.exists(self.file_path):
             return []
 
         with open(self.file_path, 'r', newline='') as f:
             reader = csv.DictReader(f)
-            for row in reader:
+            for row_dict in reader:
                 # Convert numeric types from string
                 try:
-                    row['origin_lat'] = float(row['origin_lat'])
-                    row['origin_lon'] = float(row['origin_lon'])
-                    row['dest_lat'] = float(row['dest_lat'])
-                    row['dest_lon'] = float(row['dest_lon'])
-                    row['distance_m'] = int(row['distance_m'])
-                    row['duration_s'] = int(row['duration_s'])
-                    row['duration_in_traffic_s'] = int(row['duration_in_traffic_s'])
-                    # 'start_time' is kept as an ISO string, which is fine for JSON output.
-                    # If conversion to datetime is needed here, it would be:
-                    # row['start_time'] = datetime.fromisoformat(row['start_time'])
-                except (ValueError, KeyError) as e:
-                    print(f"Skipping row due to parsing error: {row}, error: {e}")
+                    origin_lat = float(row_dict['origin_lat'])
+                    origin_lon = float(row_dict['origin_lon'])
+                    dest_lat = float(row_dict['dest_lat'])
+                    dest_lon = float(row_dict['dest_lon'])
+                    distance_m = int(row_dict['distance_m'])
+                    duration_s = int(row_dict['duration_s'])
+                    duration_in_traffic_s = int(row_dict['duration_in_traffic_s'])
+                    start_time = datetime.fromisoformat(row_dict['start_time'])
+
+                    route_data_obj = RouteData(
+                        origin_lat=origin_lat,
+                        origin_lon=origin_lon,
+                        dest_lat=dest_lat,
+                        dest_lon=dest_lon,
+                        distance_m=distance_m,
+                        duration_s=duration_s,
+                        duration_in_traffic_s=duration_in_traffic_s,
+                        start_time=start_time
+                    )
+                    records.append(route_data_obj)
+                except (ValueError, KeyError, TypeError) as e:
+                    print(f"Skipping row due to parsing or instantiation error: {row_dict}, error: {e}")
                     continue
-                records.append(row)
 
         # Sort by start_time descending (most recent first)
         # Ensure start_time exists and handle potential None or empty string if data is malformed
-        records.sort(key=lambda x: x.get('start_time', ''), reverse=True)
+        records.sort(key=lambda x: x.start_time, reverse=True)
         return records[:limit]
 
     def delete(self, **kwargs: Unpack[DeleteParams]):
@@ -80,10 +89,36 @@ class CsvStorage(DataStorage):
         criterion_key = list(kwargs.keys())[0]
         criterion_value = kwargs[criterion_key]
 
+        # --- Parameter Validation Block (Moved Earlier) ---
+        # Validate the format of the criterion_value based on criterion_key
+        # This should happen before file I/O.
+        if criterion_key == 'time':
+            time_crit_val = criterion_value
+            if not (isinstance(time_crit_val, datetime) or \
+                    (isinstance(time_crit_val, list) and all(isinstance(t, datetime) for t in time_crit_val))):
+                raise ValueError("Invalid type for 'time' criterion. Expected datetime or list of datetimes.")
+            # Further logging for 'time' can remain or be adapted here
+
+        elif criterion_key == 'time_range':
+            time_range_val = criterion_value
+            if not (isinstance(time_range_val, tuple) and len(time_range_val) == 2 and
+                    isinstance(time_range_val[0], datetime) and isinstance(time_range_val[1], datetime)):
+                raise ValueError("time_range must be a tuple of two datetime objects.")
+            if time_range_val[0] >= time_range_val[1]:
+                raise ValueError("Start of time_range must be before end of time_range.")
+            # Further logging for 'time_range' can remain or be adapted here
+
+        elif criterion_key == 'id':
+            id_val = criterion_value
+            if not (isinstance(id_val, int) or \
+                    (isinstance(id_val, list) and all(isinstance(i, int) for i in id_val))):
+                raise ValueError("Invalid type for 'id' criterion. Expected int or list of ints.")
+            # Further logging for 'id' can remain or be adapted here
+        # --- End of Parameter Validation Block ---
+
         if not os.path.exists(self.file_path):
             print(f"CSV file {self.file_path} does not exist. Nothing to delete.")
             return
-
         all_rows = []
         try:
             with open(self.file_path, 'r', newline='') as f_read:
@@ -113,9 +148,8 @@ class CsvStorage(DataStorage):
 
         rows_to_keep = []
         deleted_count = 0
-
-        # Logging the processing action (similar to SQLiteStorage)
-        # This is done after initial checks and before the main loop for clarity
+        
+        # Logging can be done here, after parameter validation and basic file checks
         if criterion_key == 'time':
             time_crit_val = criterion_value
             if isinstance(time_crit_val, list):
@@ -124,20 +158,11 @@ class CsvStorage(DataStorage):
             elif isinstance(time_crit_val, datetime):
                 time_str = self._time_round_minutes(time_crit_val).strftime('%Y-%m-%d %H:%M')
                 print(f"Processing CSV deletion based on timestamp: {time_str}")
-            else:
-                raise ValueError("Invalid type for 'time' criterion. Expected datetime or list of datetimes.")
-
         elif criterion_key == 'time_range':
             time_range_val = criterion_value
-            if not (isinstance(time_range_val, tuple) and len(time_range_val) == 2 and
-                    isinstance(time_range_val[0], datetime) and isinstance(time_range_val[1], datetime)):
-                raise ValueError("time_range must be a tuple of two datetime objects.")
-            if time_range_val[0] >= time_range_val[1]:
-                raise ValueError("Start of time_range must be before end of time_range.")
             start_str = self._time_round_minutes(time_range_val[0]).isoformat()
             end_str = self._time_round_minutes(time_range_val[1]).isoformat()
             print(f"Processing CSV deletion based on timestamp range: {start_str} to {end_str}")
-
         elif criterion_key == 'id':
             id_val = criterion_value
             if isinstance(id_val, list):

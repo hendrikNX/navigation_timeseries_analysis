@@ -199,7 +199,7 @@ def test_csv_load_data_with_limit(csv_file_path: str, base_sample_route_data: Ro
     loaded_data = storage.load(limit=2)
     assert len(loaded_data) == 2, "Should load exactly 2 records."
 
-    loaded_distances = [d['distance_m'] for d in loaded_data]
+    loaded_distances = [d.distance_m for d in loaded_data]
     assert 100 in loaded_distances, "Data1 should be loaded."
     assert 200 in loaded_distances, "Data2 should be loaded."
     assert 300 not in loaded_distances, "Data3 should not be loaded due to limit."
@@ -232,14 +232,14 @@ def test_csv_load_data_order_and_structure(csv_file_path: str, base_sample_route
     loaded_data = storage.load(limit=3)
     assert len(loaded_data) == 3, "Should load all 3 records."
 
-    assert loaded_data[0]['distance_m'] == route_data_recent.distance_m
-    assert loaded_data[1]['distance_m'] == route_data_older.distance_m
-    assert loaded_data[2]['distance_m'] == route_data_oldest.distance_m
+    assert loaded_data[0].distance_m == route_data_recent.distance_m
+    assert loaded_data[1].distance_m == route_data_older.distance_m
+    assert loaded_data[2].distance_m == route_data_oldest.distance_m
 
     first_item = loaded_data[0]
-    assert isinstance(first_item, dict)
-    assert first_item['origin_lat'] == route_data_recent.origin_lat
-    assert first_item['start_time'] == route_data_recent.start_time.isoformat()
+    assert isinstance(first_item, RouteData)
+    assert first_item.origin_lat == route_data_recent.origin_lat
+    assert first_item.start_time == route_data_recent.start_time
 
 def test_csv_delete_by_single_id(csv_file_path: str, base_sample_route_data: RouteData):
     storage = CsvStorage(file_path=csv_file_path)

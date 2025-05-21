@@ -252,7 +252,7 @@ class TestApiDeleteRoutes:
         assert len(self._get_all_db_records(db_path)) == 3
 
         # Delete using a time that falls into the first minute
-        response = client.delete(f'/api/routes?time={time_base.isoformat()}')
+        response = client.delete(f'/api/routes?time={time_base.isoformat().replace("+","%2B")}')
         assert response.status_code == 200
 
         records = self._get_all_db_records(db_path)
@@ -277,7 +277,7 @@ class TestApiDeleteRoutes:
         start_range_iso = (time_base - timedelta(minutes=5)).isoformat()
         end_range_iso = (time_base + timedelta(minutes=5)).isoformat()
 
-        response = client.delete(f'/api/routes?start_time={start_range_iso}&end_time={end_range_iso}')
+        response = client.delete(f'/api/routes?start_time={start_range_iso.replace("+","%2B")}&end_time={end_range_iso.replace("+","%2B")}')
         assert response.status_code == 200
 
         records = self._get_all_db_records(db_path)
@@ -320,7 +320,7 @@ class TestApiDeleteRoutes:
     def test_delete_invalid_time_range_start_after_end(self, client):
         start_time = datetime.now(timezone.utc)
         end_time = start_time - timedelta(hours=1)
-        response = client.delete(f'/api/routes?start_time={start_time.isoformat()}&end_time={end_time.isoformat()}')
+        response = client.delete(f'/api/routes?start_time={start_time.isoformat().replace("+","%2B")}&end_time={end_time.isoformat().replace("+","%2B")}')
         assert response.status_code == 400
         assert "Invalid parameter format" in response.json["error"] # This error comes from API layer
         assert "start_time must be before end_time" in response.json["error"]
