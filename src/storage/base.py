@@ -19,7 +19,7 @@ class DataStorage(ABC):
         pass
 
     @abstractmethod
-    def load(self, limit: int) -> list[dict]:
+    def load(self, limit: int) -> list[RouteData]:
         pass
 
     @abstractmethod

@@ -72,7 +72,7 @@ class SQLiteStorage(DataStorage):
         conn.close()
         print(f"Data saved to SQLite DB: {self.db_path}, Row ID: {cursor.lastrowid}")
 
-    def load(self, limit: int) -> list[dict]:
+    def load(self, limit: int) -> list[RouteData]:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row # Access columns by name
         cursor = conn.cursor()
@@ -80,7 +80,27 @@ class SQLiteStorage(DataStorage):
         rows = cursor.fetchall()
         conn.close()
         
-        return [dict(row) for row in rows]
+        route_data_list: list[RouteData] = []
+        for row in rows:
+            row_dict = dict(row) # Convert sqlite3.Row to a standard dictionary
+            try:
+                start_time_dt = datetime.fromisoformat(row_dict['start_time'])
+                route_data_obj = RouteData(
+                    origin_lat=row_dict['origin_lat'],
+                    origin_lon=row_dict['origin_lon'],
+                    dest_lat=row_dict['dest_lat'],
+                    dest_lon=row_dict['dest_lon'],
+                    distance_m=row_dict['distance_m'],
+                    duration_s=row_dict['duration_s'],
+                    duration_in_traffic_s=row_dict['duration_in_traffic_s'],
+                    start_time=start_time_dt
+                    # Note: 'id' from the database is not part of RouteData model
+                )
+                route_data_list.append(route_data_obj)
+            except (ValueError, KeyError, TypeError) as e:
+                print(f"Skipping row due to parsing or instantiation error: {row_dict}, error: {e}")
+                continue
+        return route_data_list
     
     def delete(self, **kwargs: Unpack[DeleteParams]):
         if not kwargs or len(kwargs) > 1:

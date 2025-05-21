@@ -137,7 +137,7 @@ class TestSQLiteStorage(unittest.TestCase):
         self.assertEqual(len(loaded_data), 2, "Should load exactly 2 records.")
 
         # Check if the most recent ones are loaded (data1 and data2)
-        loaded_distances = [d['distance_m'] for d in loaded_data]
+        loaded_distances = [d.distance_m for d in loaded_data]
         self.assertIn(100, loaded_distances, "Data1 should be loaded.")
         self.assertIn(200, loaded_distances, "Data2 should be loaded.")
         self.assertNotIn(300, loaded_distances, "Data3 should not be loaded due to limit.")
@@ -160,21 +160,21 @@ class TestSQLiteStorage(unittest.TestCase):
         self.assertEqual(len(loaded_data), 3, "Should load all 3 records.")
 
         # Verify order (most recent first)
-        self.assertEqual(loaded_data[0]['distance_m'], route_data_recent.distance_m)
-        self.assertEqual(loaded_data[1]['distance_m'], route_data_older.distance_m)
-        self.assertEqual(loaded_data[2]['distance_m'], route_data_oldest.distance_m)
+        self.assertEqual(loaded_data[0].distance_m, route_data_recent.distance_m)
+        self.assertEqual(loaded_data[1].distance_m, route_data_older.distance_m)
+        self.assertEqual(loaded_data[2].distance_m, route_data_oldest.distance_m)
 
         # Verify structure of the first loaded item
         first_item = loaded_data[0]
-        self.assertIsInstance(first_item, dict, "Loaded item should be a dictionary.")
-        self.assertEqual(first_item['origin_lat'], route_data_recent.origin_lat)
-        self.assertEqual(first_item['origin_lon'], route_data_recent.origin_lon)
-        self.assertEqual(first_item['dest_lat'], route_data_recent.dest_lat)
-        self.assertEqual(first_item['dest_lon'], route_data_recent.dest_lon)
-        self.assertEqual(first_item['distance_m'], route_data_recent.distance_m)
-        self.assertEqual(first_item['duration_s'], route_data_recent.duration_s)
-        self.assertEqual(first_item['duration_in_traffic_s'], route_data_recent.duration_in_traffic_s)
-        self.assertEqual(first_item['start_time'], route_data_recent.start_time.isoformat())
+        self.assertIsInstance(first_item, RouteData, "Loaded item should be an intance of RouteData.")
+        self.assertEqual(first_item.origin_lat, route_data_recent.origin_lat)
+        self.assertEqual(first_item.origin_lon, route_data_recent.origin_lon)
+        self.assertEqual(first_item.dest_lat, route_data_recent.dest_lat)
+        self.assertEqual(first_item.dest_lon, route_data_recent.dest_lon)
+        self.assertEqual(first_item.distance_m, route_data_recent.distance_m)
+        self.assertEqual(first_item.duration_s, route_data_recent.duration_s)
+        self.assertEqual(first_item.duration_in_traffic_s, route_data_recent.duration_in_traffic_s)
+        self.assertEqual(first_item.start_time, route_data_recent.start_time)
 
     def _get_all_records(self, order_by="id ASC"):
         conn = sqlite3.connect(self.db_path)
