@@ -18,10 +18,15 @@ class RouteData:
         if not isinstance(self.start_time, datetime):
             raise TypeError(f"start_time must be a datetime object, but got {type(self.start_time)}.")
         if self.start_time.tzinfo is None or self.start_time.tzinfo.utcoffset(self.start_time) is None:
-            raise ValueError("start_time must be timezone-aware.")
+            raise ValueError("start_time must be timezone-aware.")        
+
+    @classmethod
+    def get_static_field_names(cls) -> List[str]:
+        """Returns the field names of the dataclass as a class method."""
+        return [field.name for field in fields(cls)]
 
     def get_field_names(self) -> List[str]:
-        return [field.name for field in fields(self)]
+        return self.get_static_field_names()
 
 def route_data_list_to_dataframe(data_list: List[RouteData]) -> pd.DataFrame:
     """
@@ -36,8 +41,7 @@ def route_data_list_to_dataframe(data_list: List[RouteData]) -> pd.DataFrame:
     """
     if not data_list:
         # Return an empty DataFrame with correct columns if the list is empty
-        # This uses the fields from the RouteData class to define columns
-        return pd.DataFrame(columns=RouteData.get_field_names(RouteData(0,0,0,0,0,0,0,datetime.now(tz=datetime.now().astimezone().tzinfo)))) # type: ignore
+        return pd.DataFrame(columns=RouteData.get_static_field_names())
 
     # Convert list of dataclass objects to DataFrame
     df = pd.DataFrame([asdict(data_item) for data_item in data_list])
