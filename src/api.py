@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from datetime import datetime
 # import sqlite3 # No longer needed directly here
+from dataclasses import asdict
 
 # Assuming src is in PYTHONPATH or running from project root
 try:
@@ -76,8 +77,15 @@ def get_route_data():
         if limit <= 0 or limit > 1000: # Add a reasonable upper bound
             limit = 100
 
-        data = storage.load(limit=limit)
-        return jsonify(data), 200
+        loaded_route_data_objects = storage.load(limit=limit)
+
+        data_for_json = []
+        for rd_obj in loaded_route_data_objects:
+            rd_dict = asdict(rd_obj)
+            if isinstance(rd_obj.start_time, datetime):
+                rd_dict['start_time'] = rd_obj.start_time.isoformat()
+            data_for_json.append(rd_dict)
+        return jsonify(data_for_json), 200
     except Exception as e:
         app.logger.error(f"Error fetching data: {e}")
         return jsonify({"error": "An internal error occurred while fetching data"}), 500
